@@ -1,4 +1,5 @@
 import json
+import os
 import uuid
 from datetime import datetime, timezone
 
@@ -32,6 +33,7 @@ def _get_or_create_session(
             value=session_id,
             httponly=True,
             samesite="lax",
+            max_age=30 * 24 * 60 * 60,  # 30 days
         )
     return session_id
 
@@ -63,18 +65,20 @@ async def upload_document(
     doc_id = str(uuid.uuid4())
     created_at = datetime.now(timezone.utc)
 
+    safe_filename = os.path.basename(file.filename or "unknown.pdf")
+
     vector_service.add_document_chunks(
         session_id=session_id,
         doc_id=doc_id,
         chunks=chunks,
         embeddings=embeddings,
-        filename=file.filename or "unknown.pdf",
+        filename=safe_filename,
         created_at=created_at.isoformat(),
     )
 
     return DocumentUploadResponse(
         doc_id=doc_id,
-        filename=file.filename or "unknown.pdf",
+        filename=safe_filename,
         chunk_count=len(chunks),
         created_at=created_at,
     )

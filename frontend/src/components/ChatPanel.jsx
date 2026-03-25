@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, Square, MessageSquare } from 'lucide-react'
+import { Send, Square, MessageSquare, Trash2 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import axios from 'axios'
 import { useChat } from '../hooks/useChat'
@@ -122,9 +122,8 @@ export default function ChatPanel({ activeDoc }) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  useEffect(() => {
-    clearMessages()
-  }, [activeDoc?.doc_id])
+  // Load history for the newly selected doc (useChat handles this via its own effect).
+  // We intentionally do NOT call clearMessages() here — that would wipe localStorage.
 
   const submit = () => {
     const q = input.trim()
@@ -157,9 +156,20 @@ export default function ChatPanel({ activeDoc }) {
   return (
     <div className="flex-1 flex flex-col bg-slate-50 dark:bg-slate-950 min-h-0">
       {/* Doc header */}
-      <div className="px-4 py-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-        <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{activeDoc.filename}</p>
-        <p className="text-xs text-slate-400 dark:text-slate-500">Ask anything about this document</p>
+      <div className="flex items-center justify-between px-4 py-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{activeDoc.filename}</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500">Ask anything about this document</p>
+        </div>
+        {messages.length > 0 && (
+          <button
+            onClick={clearMessages}
+            title="Clear conversation"
+            className="shrink-0 ml-3 p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
       </div>
 
       {/* Messages */}

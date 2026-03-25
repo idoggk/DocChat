@@ -8,8 +8,9 @@ export function useChat(docId) {
   const sendMessage = useCallback(async (question) => {
     if (!docId || streaming) return
 
-    const userMsg = { id: Date.now(), role: 'user', text: question }
-    const aiMsg = { id: Date.now() + 1, role: 'ai', text: '', sources: null, done: false }
+    const base = Date.now()
+    const userMsg = { id: `${base}-u`, role: 'user', text: question }
+    const aiMsg = { id: `${base}-a`, role: 'ai', text: '', sources: null, done: false }
 
     setMessages(prev => [...prev, userMsg, aiMsg])
     setStreaming(true)
@@ -75,7 +76,7 @@ export function useChat(docId) {
     } finally {
       setStreaming(false)
     }
-  }, [docId, streaming])
+  }, [docId])
 
   const clearMessages = useCallback(() => setMessages([]), [])
 

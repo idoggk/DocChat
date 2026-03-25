@@ -1,3 +1,5 @@
+import json
+
 from fastapi import APIRouter, Cookie, HTTPException, Response
 from fastapi.responses import StreamingResponse
 
@@ -22,8 +24,9 @@ async def chat_with_document(
             async for event in rag_stream(session_id, doc_id, body.question):
                 yield event
         except ValueError as e:
-            import json
             yield f"event: error\ndata: {json.dumps({'detail': str(e)})}\n\n"
+        except Exception as e:
+            yield f"event: error\ndata: {json.dumps({'detail': 'An unexpected error occurred.'})}\n\n"
 
     return StreamingResponse(
         event_stream(),

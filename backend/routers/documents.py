@@ -146,11 +146,19 @@ async def get_suggested_questions(
         max_tokens=60,
     )
 
-    raw = completion.choices[0].message.content.strip().strip("`").lstrip("json").strip()
-    topics: list[str] = json.loads(raw)
+    FALLBACK = ["What is this document about?", "Summarize the key points.",
+                "What are the main topics covered?", "List any important dates or numbers."]
+    try:
+        raw = completion.choices[0].message.content.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1].lstrip("json").strip()
+        topics: list[str] = json.loads(raw.strip())
+        if not isinstance(topics, list) or len(topics) == 0:
+            raise ValueError("empty or invalid topic list")
+        questions = [f"What is the {t.lower().strip()}?" for t in topics[:4]]
+    except Exception:
+        questions = FALLBACK
 
-    # Step 2: format on the backend — GPT has no say in the final length
-    questions = [f"What is the {t.lower().strip()}?" for t in topics[:4]]
     return {"questions": questions}
 
 

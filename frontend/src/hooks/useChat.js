@@ -1,8 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 
-function storageKey(docIds) {
-  if (!docIds || docIds.length === 0) return null
-  return `chat_${[...docIds].sort().join(',')}`
+function storageKey(docId) {
+  return docId ? `chat_${docId}` : null
 }
 
 function loadMessages(key) {
@@ -10,7 +9,6 @@ function loadMessages(key) {
   try {
     const raw = localStorage.getItem(key)
     if (!raw) return []
-    // Only restore fully completed messages
     const msgs = JSON.parse(raw)
     return msgs.filter(m => m.role === 'user' || m.done)
   } catch {
@@ -20,56 +18,49 @@ function loadMessages(key) {
 
 function saveMessages(key, msgs) {
   if (!key) return
-  try {
-    localStorage.setItem(key, JSON.stringify(msgs))
-  } catch { /* quota exceeded — ignore */ }
+  try { localStorage.setItem(key, JSON.stringify(msgs)) } catch { /* ignore */ }
 }
 
-export function useChat(docIds) {
-  const key = storageKey(docIds)
+export function useChat(docId) {
+  const key = storageKey(docId)
   const [messages, setMessages] = useState(() => loadMessages(key))
   const [streaming, setStreaming] = useState(false)
   const [error, setError] = useState(null)
   const abortRef = useRef(null)
   const messagesRef = useRef(messages)
 
-  // Keep ref in sync for use in callbacks
   useEffect(() => { messagesRef.current = messages }, [messages])
 
-  // Reload from localStorage when the doc selection changes
   useEffect(() => {
-    setMessages(loadMessages(key))
+    setMessages(loadMessages(storageKey(docId)))
     setError(null)
-  }, [key])
+  }, [docId])
 
   const sendMessage = useCallback(async (question) => {
-    if (!docIds?.length || streaming) return
+    if (!docId || streaming) return
 
-    // Cancel any previous in-flight request
     abortRef.current?.abort()
     const controller = new AbortController()
     abortRef.current = controller
 
     const base = Date.now()
     const userMsg = { id: `${base}-u`, role: 'user', text: question }
-    const aiMsg = { id: `${base}-a`, role: 'ai', text: '', sources: null, done: false }
+    const aiMsg  = { id: `${base}-a`, role: 'ai',   text: '', sources: null, done: false }
 
     setMessages(prev => [...prev, userMsg, aiMsg])
     setStreaming(true)
     setError(null)
 
     try {
-      const response = await fetch('/api/chat/', {
+      const response = await fetch(`/api/chat/${docId}`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question, doc_ids: docIds }),
+        body: JSON.stringify({ question }),
         signal: controller.signal,
       })
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
-      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
 
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
@@ -113,7 +104,6 @@ export function useChat(docIds) {
       }
     } catch (e) {
       if (e.name === 'AbortError') {
-        // User-initiated abort — mark message as done without error text
         setMessages(prev => prev.map(m =>
           m.id === aiMsg.id ? { ...m, done: true } : m
         ))
@@ -125,14 +115,11 @@ export function useChat(docIds) {
       ))
     } finally {
       setStreaming(false)
-      // Persist to localStorage after streaming ends
-      saveMessages(key, messagesRef.current)
+      saveMessages(storageKey(docId), messagesRef.current)
     }
-  }, [docIds, key])
+  }, [docId])
 
-  const abort = useCallback(() => {
-    abortRef.current?.abort()
-  }, [])
+  const abort = useCallback(() => { abortRef.current?.abort() }, [])
 
   const clearMessages = useCallback(() => {
     setMessages([])

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, Square, FileText, MessageSquare } from 'lucide-react'
+import { Send, Square, MessageSquare } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import axios from 'axios'
 import { useChat } from '../hooks/useChat'
@@ -53,12 +53,12 @@ function MarkdownContent({ text }) {
   )
 }
 
-function BotAvatar({ streaming }) {
+function BotAvatar({ isStreaming }) {
   return (
     <div className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
-      streaming ? 'bg-blue-500' : 'bg-blue-600'
+      isStreaming ? 'bg-blue-500' : 'bg-blue-600'
     }`}>
-      {streaming ? (
+      {isStreaming ? (
         <span className="inline-flex gap-0.5 items-center">
           <span className="w-1 h-1 bg-white rounded-full animate-bounce [animation-delay:0ms]" />
           <span className="w-1 h-1 bg-white rounded-full animate-bounce [animation-delay:150ms]" />
@@ -87,8 +87,7 @@ function Message({ msg, isStreaming }) {
   const isAI = msg.role === 'ai'
   return (
     <div className={`flex gap-3 ${isAI ? '' : 'flex-row-reverse'}`}>
-      {isAI ? <BotAvatar streaming={isStreaming && !msg.done} /> : <UserAvatar />}
-
+      {isAI ? <BotAvatar isStreaming={isStreaming && !msg.done} /> : <UserAvatar />}
       <div className={`max-w-[75%] ${isAI ? '' : 'items-end flex flex-col'}`}>
         <div className={`px-3 py-2.5 rounded-2xl text-sm leading-relaxed ${
           isAI
@@ -113,10 +112,9 @@ function Message({ msg, isStreaming }) {
   )
 }
 
-export default function ChatPanel({ selectedDocs }) {
-  const docIds = selectedDocs.map(d => d.doc_id)
-  const { messages, streaming, sendMessage, clearMessages, abort } = useChat(docIds)
-  const { questions, loading: questionsLoading } = useSuggestedQuestions(docIds[0] ?? null)
+export default function ChatPanel({ activeDoc }) {
+  const { messages, streaming, sendMessage, clearMessages, abort } = useChat(activeDoc?.doc_id)
+  const { questions, loading: questionsLoading } = useSuggestedQuestions(activeDoc?.doc_id)
   const [input, setInput] = useState('')
   const bottomRef = useRef(null)
 
@@ -126,7 +124,7 @@ export default function ChatPanel({ selectedDocs }) {
 
   useEffect(() => {
     clearMessages()
-  }, [docIds.join(',')])
+  }, [activeDoc?.doc_id])
 
   const submit = () => {
     const q = input.trim()
@@ -142,7 +140,7 @@ export default function ChatPanel({ selectedDocs }) {
     }
   }
 
-  if (selectedDocs.length === 0) {
+  if (!activeDoc) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-slate-50 dark:bg-slate-950 text-center px-6">
         <div className="w-14 h-14 rounded-2xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
@@ -150,7 +148,7 @@ export default function ChatPanel({ selectedDocs }) {
         </div>
         <h2 className="text-lg font-semibold text-slate-700 dark:text-slate-300">Select a document to chat</h2>
         <p className="text-sm text-slate-400 dark:text-slate-500 max-w-xs">
-          Click any document in the sidebar to start chatting. Select multiple to chat across them.
+          Click a document in the sidebar to start chatting with it.
         </p>
       </div>
     )
@@ -160,24 +158,8 @@ export default function ChatPanel({ selectedDocs }) {
     <div className="flex-1 flex flex-col bg-slate-50 dark:bg-slate-950 min-h-0">
       {/* Doc header */}
       <div className="px-4 py-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-        {selectedDocs.length === 1 ? (
-          <>
-            <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{selectedDocs[0].filename}</p>
-            <p className="text-xs text-slate-400 dark:text-slate-500">Ask anything about this document</p>
-          </>
-        ) : (
-          <>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {selectedDocs.map(d => (
-                <span key={d.doc_id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-medium">
-                  <FileText size={10} />
-                  {d.filename.replace(/\.pdf$/i, '')}
-                </span>
-              ))}
-            </div>
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Chatting across {selectedDocs.length} documents</p>
-          </>
-        )}
+        <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{activeDoc.filename}</p>
+        <p className="text-xs text-slate-400 dark:text-slate-500">Ask anything about this document</p>
       </div>
 
       {/* Messages */}

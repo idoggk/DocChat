@@ -9,20 +9,19 @@ from services.chat_service import rag_stream
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 
-@router.post("/")
-async def chat_with_documents(
+@router.post("/{doc_id}")
+async def chat_with_document(
+    doc_id: str,
     body: ChatRequest,
     response: Response,
     session_id: str | None = Cookie(default=None),
 ) -> StreamingResponse:
     if not session_id:
         raise HTTPException(status_code=401, detail="No session found. Upload a document first.")
-    if not body.doc_ids:
-        raise HTTPException(status_code=400, detail="No document IDs provided.")
 
     async def event_stream():
         try:
-            async for event in rag_stream(session_id, body.doc_ids, body.question):
+            async for event in rag_stream(session_id, doc_id, body.question):
                 yield event
         except ValueError as e:
             yield f"event: error\ndata: {json.dumps({'detail': str(e)})}\n\n"

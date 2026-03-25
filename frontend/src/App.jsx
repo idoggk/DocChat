@@ -7,7 +7,7 @@ import ErrorBoundary from './components/ErrorBoundary'
 import { useDocuments } from './hooks/useDocuments'
 
 export default function App() {
-  const [selectedDocIds, setSelectedDocIds] = useState([])
+  const [activeDoc, setActiveDoc] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { documents, loading, uploading, uploadProgress, error, uploadDocument, deleteDocument } = useDocuments()
 
@@ -15,23 +15,13 @@ export default function App() {
 
   const handleUpload = async (file) => {
     const doc = await uploadDocument(file)
-    if (doc) setSelectedDocIds([doc.doc_id])
-  }
-
-  const handleToggleDoc = (doc) => {
-    setSelectedDocIds(prev =>
-      prev.includes(doc.doc_id)
-        ? prev.filter(id => id !== doc.doc_id)
-        : [...prev, doc.doc_id]
-    )
+    if (doc) setActiveDoc({ doc_id: doc.doc_id, filename: doc.filename })
   }
 
   const handleDelete = (docId) => {
     deleteDocument(docId)
-    setSelectedDocIds(prev => prev.filter(id => id !== docId))
+    if (activeDoc?.doc_id === docId) setActiveDoc(null)
   }
-
-  const selectedDocs = documents.filter(d => selectedDocIds.includes(d.doc_id))
 
   if (showWelcome) {
     return (
@@ -46,7 +36,6 @@ export default function App() {
   return (
     <ErrorBoundary>
       <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-950">
-        {/* Mobile overlay */}
         {sidebarOpen && (
           <div
             className="fixed inset-0 bg-black/40 z-20 md:hidden"
@@ -54,7 +43,6 @@ export default function App() {
           />
         )}
 
-        {/* Sidebar */}
         <div className={`
           fixed inset-y-0 left-0 z-30 w-72 md:relative md:z-auto md:flex md:flex-col
           transform transition-transform duration-200
@@ -66,17 +54,15 @@ export default function App() {
             uploading={uploading}
             uploadProgress={uploadProgress}
             error={error}
-            selectedDocIds={selectedDocIds}
-            onToggle={(doc) => { handleToggleDoc(doc); setSidebarOpen(false) }}
+            activeDocId={activeDoc?.doc_id}
+            onSelect={(doc) => { setActiveDoc(doc); setSidebarOpen(false) }}
             onUpload={handleUpload}
             onDelete={handleDelete}
             onClose={() => setSidebarOpen(false)}
           />
         </div>
 
-        {/* Main content */}
         <div className="flex-1 flex flex-col min-w-0">
-          {/* Mobile header */}
           <div className="flex items-center gap-3 px-4 py-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 md:hidden">
             <button
               onClick={() => setSidebarOpen(true)}
@@ -88,7 +74,7 @@ export default function App() {
           </div>
 
           <ErrorBoundary>
-            <ChatPanel selectedDocs={selectedDocs} />
+            <ChatPanel activeDoc={activeDoc} />
           </ErrorBoundary>
         </div>
       </div>

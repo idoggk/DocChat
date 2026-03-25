@@ -50,8 +50,6 @@ cd docchat
 ```bash
 cd backend
 pip install -r requirements.txt
-cp ../.env.example .env
-# Add your OPENAI_API_KEY to .env
 uvicorn main:app --reload --port 8000
 ```
 
@@ -67,10 +65,16 @@ npm run dev   # runs on http://localhost:5173
 
 ## Environment Variables
 
-Create a `.env` file in the project root (or `backend/`):
+Create a `.env` file in the **project root** (next to `backend/`):
 
 ```
 OPENAI_API_KEY=sk-...
+```
+
+Optional:
+```
+CHROMA_PERSIST_DIR=./chroma_data
+FRONTEND_URL=http://localhost:5173
 ```
 
 ---

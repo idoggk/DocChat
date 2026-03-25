@@ -1,35 +1,91 @@
-import { useState } from 'react'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { FileText, X, BookOpen } from 'lucide-react'
 
-function SourceChip({ source, index }) {
-  const [expanded, setExpanded] = useState(false)
-  const label = `Page ${source.page_number ?? '?'} · Chunk ${source.chunk_index + 1}`
+function SourceModal({ source, onClose }) {
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  const page = source.page_number ?? source.page
 
   return (
-    <div className="inline-block">
-      <button
-        onClick={() => setExpanded(e => !e)}
-        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800 transition-colors"
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden"
+        onClick={e => e.stopPropagation()}
       >
-        {label}
-        {expanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
-      </button>
-      {expanded && (
-        <div className="mt-1 p-2 rounded-lg text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 max-w-sm">
-          {source.text_snippet}…
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+          <div className="flex items-center gap-2">
+            <BookOpen size={15} className="text-blue-500 shrink-0" />
+            <div>
+              <p className="text-xs font-semibold text-blue-600 dark:text-blue-400">
+                {page ? `Page ${page}` : 'Source'}
+              </p>
+              <p className="text-sm font-medium text-slate-800 dark:text-slate-200 leading-tight">
+                {source.title}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+          >
+            <X size={16} />
+          </button>
         </div>
-      )}
+
+        {/* Content */}
+        <div className="px-5 py-4 max-h-80 overflow-y-auto">
+          <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
+            {source.text_snippet}
+          </p>
+        </div>
+
+        <div className="px-5 py-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+          <p className="text-xs text-slate-400 dark:text-slate-500">
+            This excerpt was retrieved from the document to answer your question.
+          </p>
+        </div>
+      </div>
     </div>
+  )
+}
+
+function SourceChip({ source, index }) {
+  const [open, setOpen] = useState(false)
+  const page = source.page_number ?? source.page
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-700/60 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 transition-colors"
+      >
+        <FileText size={11} className="shrink-0 text-blue-500" />
+        {page ? `Page ${page}` : `Source ${(source.chunk_index ?? index) + 1}`}
+      </button>
+
+      {open && <SourceModal source={source} onClose={() => setOpen(false)} />}
+    </>
   )
 }
 
 export default function SourceChips({ sources }) {
   if (!sources || sources.length === 0) return null
   return (
-    <div className="mt-2 flex flex-wrap gap-1.5">
-      {sources.map((s, i) => (
-        <SourceChip key={i} source={s} index={i} />
-      ))}
+    <div className="mt-2">
+      <p className="text-xs text-slate-400 dark:text-slate-500 mb-1.5">Sources used:</p>
+      <div className="flex flex-wrap gap-1.5">
+        {sources.map((s, i) => (
+          <SourceChip key={i} source={s} index={i} />
+        ))}
+      </div>
     </div>
   )
 }

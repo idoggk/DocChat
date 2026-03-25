@@ -1,13 +1,17 @@
+import json
 import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Cookie, HTTPException, Request, Response, UploadFile
+from openai import AsyncOpenAI
 
 import services.chunking_service as chunking_service
 import services.embedding_service as embedding_service
 import services.pdf_service as pdf_service
 import services.vector_service as vector_service
-from config import MAX_UPLOAD_SIZE_BYTES
+from config import CHAT_MODEL, MAX_UPLOAD_SIZE_BYTES, OPENAI_API_KEY
+
+_openai = AsyncOpenAI(api_key=OPENAI_API_KEY)
 from schemas.documents import (
     DeleteResponse,
     DocumentListResponse,
@@ -111,6 +115,42 @@ async def get_document(
         chunk_count=meta["chunk_count"],
         created_at=datetime.fromisoformat(meta["created_at"]),
     )
+
+
+@router.get("/{doc_id}/questions")
+async def get_suggested_questions(
+    doc_id: str,
+    response: Response,
+    session_id: str | None = Cookie(default=None),
+) -> dict:
+    session_id = _get_or_create_session(response, session_id)
+    sample_chunks = vector_service.get_document_chunks_sample(session_id, doc_id, n=6)
+    if not sample_chunks:
+        raise HTTPException(status_code=404, detail="Document not found.")
+
+    context = "\n\n---\n\n".join(sample_chunks)
+    prompt = (
+        "Based on the following document excerpts, generate exactly 4 specific, interesting questions "
+        "that a user might want to ask about this document. "
+        "The questions should be concrete and relevant to the actual content — not generic. "
+        "Return ONLY a JSON array of 4 strings, no explanation.\n\n"
+        f"Document excerpts:\n{context}"
+    )
+
+    completion = await _openai.chat.completions.create(
+        model=CHAT_MODEL,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.4,
+        max_tokens=300,
+    )
+    raw = completion.choices[0].message.content.strip()
+    # Strip markdown code fences if present
+    if raw.startswith("```"):
+        raw = raw.split("```")[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+    questions: list[str] = json.loads(raw.strip())
+    return {"questions": questions[:4]}
 
 
 @router.delete("/{doc_id}", response_model=DeleteResponse)

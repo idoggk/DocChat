@@ -102,6 +102,31 @@ def get_document_metadata(session_id: str, doc_id: str) -> dict | None:
     return {**meta, "chunk_count": chunk_count}
 
 
+def get_document_chunks_sample(session_id: str, doc_id: str, n: int = 6) -> list[str]:
+    """Return up to n chunk texts from a document, spread across early pages."""
+    try:
+        collection = _client.get_collection(name=_collection_name(session_id))
+    except Exception:
+        return []
+
+    results = collection.get(
+        where={"doc_id": doc_id},
+        include=["documents", "metadatas"],
+    )
+    if not results["documents"]:
+        return []
+
+    # Sort by page so we sample meaningful content pages, not appendix/metadata pages
+    paired = sorted(
+        zip(results["documents"], results["metadatas"]),
+        key=lambda x: x[1].get("page") or 999,
+    )
+    # Take every Nth chunk to spread coverage across the document
+    step = max(1, len(paired) // n)
+    sample = [text for text, _ in paired[::step]][:n]
+    return sample
+
+
 def delete_document(session_id: str, doc_id: str) -> bool:
     """Delete all vectors for a document. Returns True if anything was deleted."""
     try:

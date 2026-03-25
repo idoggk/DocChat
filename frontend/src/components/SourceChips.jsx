@@ -65,10 +65,19 @@ function SourceChip({ source, index }) {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-700/60 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 transition-colors"
+        className="inline-flex items-start gap-1.5 px-2.5 py-1.5 rounded-lg text-xs bg-slate-100 hover:bg-slate-200 dark:bg-slate-700/60 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600 transition-colors text-left max-w-[200px]"
       >
-        <FileText size={11} className="shrink-0 text-blue-500" />
-        {page ? `Page ${page}` : `Source ${(source.chunk_index ?? index) + 1}`}
+        <FileText size={11} className="shrink-0 text-blue-500 mt-0.5" />
+        <span className="flex flex-col min-w-0">
+          <span className="font-semibold text-blue-600 dark:text-blue-400 leading-tight">
+            {page ? `Page ${page}` : `Source ${(source.chunk_index ?? index) + 1}`}
+          </span>
+          {source.title && (
+            <span className="text-slate-500 dark:text-slate-400 font-normal leading-tight truncate">
+              {source.title.length > 45 ? source.title.slice(0, 45) + '…' : source.title}
+            </span>
+          )}
+        </span>
       </button>
 
       {open && <SourceModal source={source} onClose={() => setOpen(false)} />}

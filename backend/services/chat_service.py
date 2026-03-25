@@ -46,14 +46,35 @@ def _is_readable(text: str) -> bool:
     return True
 
 
-def _extract_title(text: str) -> str:
-    """Pull a short readable headline from the start of the chunk."""
-    clean = " ".join(text.split())
-    for sep in (". ", ".\n", "! ", "? ", ": "):
-        idx = clean.find(sep)
-        if 15 < idx < 90:
-            return clean[: idx + 1]
-    return clean[:80] + ("…" if len(clean) > 80 else "")
+async def _generate_titles(chunks: list[dict]) -> list[str]:
+    """Ask GPT to generate a 4-6 word headline for each chunk in one call."""
+    items = "\n\n".join(
+        f"[{i + 1}] {' '.join(c['text'].split())[:300]}"
+        for i, c in enumerate(chunks)
+    )
+    prompt = (
+        f"For each of the following {len(chunks)} text excerpts, write a 4-6 word headline "
+        "that captures its specific topic (e.g. 'Monthly Salary and Payment Terms'). "
+        "Return ONLY a JSON array of strings, one per excerpt, in the same order.\n\n"
+        + items
+    )
+    try:
+        completion = await _client.chat.completions.create(
+            model=CHAT_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=200,
+        )
+        raw = completion.choices[0].message.content.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1].lstrip("json").strip()
+        titles: list[str] = json.loads(raw)
+        if len(titles) == len(chunks):
+            return titles
+    except Exception:
+        pass
+    # Fallback: first 60 chars of each chunk
+    return [" ".join(c["text"].split())[:60] + "…" for c in chunks]
 
 
 async def rag_stream(
@@ -85,15 +106,18 @@ async def rag_stream(
         if delta.content:
             yield f"event: chunk\ndata: {json.dumps({'text': delta.content})}\n\n"
 
+    readable = [
+        (i, chunk) for i, chunk in enumerate(chunks) if _is_readable(chunk["text"])
+    ]
+    titles = await _generate_titles([c for _, c in readable])
     sources = [
         {
-            "chunk_index": i,
+            "chunk_index": orig_i,
             "page_number": chunk.get("page"),
-            "title": _extract_title(chunk["text"]),
-            "text_snippet": " ".join(chunk["text"].split()),  # full clean text
+            "title": titles[j],
+            "text_snippet": " ".join(chunk["text"].split()),
         }
-        for i, chunk in enumerate(chunks)
-        if _is_readable(chunk["text"])
+        for j, (orig_i, chunk) in enumerate(readable)
     ]
     yield f"event: sources\ndata: {json.dumps(sources)}\n\n"
     yield "event: done\ndata: {}\n\n"

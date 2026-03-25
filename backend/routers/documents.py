@@ -128,29 +128,30 @@ async def get_suggested_questions(
     if not sample_chunks:
         raise HTTPException(status_code=404, detail="Document not found.")
 
-    context = "\n\n---\n\n".join(sample_chunks)
-    prompt = (
-        "Based on the following document excerpts, generate exactly 4 specific, interesting questions "
-        "that a user might want to ask about this document. "
-        "The questions should be concrete and relevant to the actual content — not generic. "
-        "Return ONLY a JSON array of 4 strings, no explanation.\n\n"
-        f"Document excerpts:\n{context}"
-    )
-
+    # Step 1: ask GPT for 4 short noun-phrase topics (not questions — GPT can't help making questions short)
+    context = "\n\n---\n\n".join(c[:400] for c in sample_chunks)
     completion = await _openai.chat.completions.create(
         model=CHAT_MODEL,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.4,
-        max_tokens=300,
+        messages=[{
+            "role": "user",
+            "content": (
+                "Read these document excerpts and return a JSON array of exactly 4 topics.\n"
+                "Each topic = 2-3 words, noun phrase, specific to this document.\n"
+                "Example output: [\"base salary\", \"NDA terms\", \"notice period\", \"equity grant\"]\n"
+                "Return ONLY the JSON array.\n\n"
+                + context
+            ),
+        }],
+        temperature=0.3,
+        max_tokens=60,
     )
-    raw = completion.choices[0].message.content.strip()
-    # Strip markdown code fences if present
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-    questions: list[str] = json.loads(raw.strip())
-    return {"questions": questions[:4]}
+
+    raw = completion.choices[0].message.content.strip().strip("`").lstrip("json").strip()
+    topics: list[str] = json.loads(raw)
+
+    # Step 2: format on the backend — GPT has no say in the final length
+    questions = [f"What is the {t.lower().strip()}?" for t in topics[:4]]
+    return {"questions": questions}
 
 
 @router.delete("/{doc_id}", response_model=DeleteResponse)

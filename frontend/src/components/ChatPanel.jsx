@@ -8,7 +8,7 @@ import SourceChips from './SourceChips'
 const FALLBACK_QUESTIONS = [
   'What is this document about?',
   'Summarize the key points.',
-  'What are the main conclusions?',
+  'What are the main topics covered?',
   'List any important dates or numbers.',
 ]
 

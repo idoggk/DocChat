@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, Loader2, Bot, User, MessageSquare } from 'lucide-react'
+import { Send, Square, FileText, MessageSquare } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import axios from 'axios'
 import { useChat } from '../hooks/useChat'
@@ -53,21 +53,42 @@ function MarkdownContent({ text }) {
   )
 }
 
-function Message({ msg }) {
+function BotAvatar({ streaming }) {
+  return (
+    <div className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
+      streaming ? 'bg-blue-500' : 'bg-blue-600'
+    }`}>
+      {streaming ? (
+        <span className="inline-flex gap-0.5 items-center">
+          <span className="w-1 h-1 bg-white rounded-full animate-bounce [animation-delay:0ms]" />
+          <span className="w-1 h-1 bg-white rounded-full animate-bounce [animation-delay:150ms]" />
+          <span className="w-1 h-1 bg-white rounded-full animate-bounce [animation-delay:300ms]" />
+        </span>
+      ) : (
+        <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 text-white fill-current">
+          <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7H3a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2M7.5 14a1.5 1.5 0 0 0-1.5 1.5A1.5 1.5 0 0 0 7.5 17 1.5 1.5 0 0 0 9 15.5 1.5 1.5 0 0 0 7.5 14m9 0a1.5 1.5 0 0 0-1.5 1.5 1.5 1.5 0 0 0 1.5 1.5 1.5 1.5 0 0 0 1.5-1.5A1.5 1.5 0 0 0 16.5 14M3 21l2.5-3h13l2.5 3H3z"/>
+        </svg>
+      )}
+    </div>
+  )
+}
+
+function UserAvatar() {
+  return (
+    <div className="shrink-0 w-7 h-7 rounded-full bg-slate-300 dark:bg-slate-700 flex items-center justify-center">
+      <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 text-slate-600 dark:text-slate-300 fill-current">
+        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4m0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+      </svg>
+    </div>
+  )
+}
+
+function Message({ msg, isStreaming }) {
   const isAI = msg.role === 'ai'
   return (
     <div className={`flex gap-3 ${isAI ? '' : 'flex-row-reverse'}`}>
-      {/* Avatar */}
-      <div className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center ${
-        isAI ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'
-      }`}>
-        {isAI
-          ? <Bot size={14} className="text-white" />
-          : <User size={14} className="text-slate-700 dark:text-slate-300" />
-        }
-      </div>
+      {isAI ? <BotAvatar streaming={isStreaming && !msg.done} /> : <UserAvatar />}
 
-      {/* Bubble */}
       <div className={`max-w-[75%] ${isAI ? '' : 'items-end flex flex-col'}`}>
         <div className={`px-3 py-2.5 rounded-2xl text-sm leading-relaxed ${
           isAI
@@ -92,9 +113,10 @@ function Message({ msg }) {
   )
 }
 
-export default function ChatPanel({ activeDoc }) {
-  const { messages, streaming, sendMessage, clearMessages } = useChat(activeDoc?.doc_id)
-  const { questions, loading: questionsLoading } = useSuggestedQuestions(activeDoc?.doc_id)
+export default function ChatPanel({ selectedDocs }) {
+  const docIds = selectedDocs.map(d => d.doc_id)
+  const { messages, streaming, sendMessage, clearMessages, abort } = useChat(docIds)
+  const { questions, loading: questionsLoading } = useSuggestedQuestions(docIds[0] ?? null)
   const [input, setInput] = useState('')
   const bottomRef = useRef(null)
 
@@ -104,7 +126,7 @@ export default function ChatPanel({ activeDoc }) {
 
   useEffect(() => {
     clearMessages()
-  }, [activeDoc?.doc_id])
+  }, [docIds.join(',')])
 
   const submit = () => {
     const q = input.trim()
@@ -120,15 +142,15 @@ export default function ChatPanel({ activeDoc }) {
     }
   }
 
-  if (!activeDoc) {
+  if (selectedDocs.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-slate-50 dark:bg-slate-950 text-center px-6">
         <div className="w-14 h-14 rounded-2xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
           <MessageSquare size={26} className="text-blue-600 dark:text-blue-400" />
         </div>
-        <h2 className="text-lg font-semibold text-slate-700 dark:text-slate-300">Upload a PDF to get started</h2>
+        <h2 className="text-lg font-semibold text-slate-700 dark:text-slate-300">Select a document to chat</h2>
         <p className="text-sm text-slate-400 dark:text-slate-500 max-w-xs">
-          Select a document from the sidebar or upload a new one to start chatting.
+          Click any document in the sidebar to start chatting. Select multiple to chat across them.
         </p>
       </div>
     )
@@ -138,8 +160,24 @@ export default function ChatPanel({ activeDoc }) {
     <div className="flex-1 flex flex-col bg-slate-50 dark:bg-slate-950 min-h-0">
       {/* Doc header */}
       <div className="px-4 py-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-        <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{activeDoc.filename}</p>
-        <p className="text-xs text-slate-400 dark:text-slate-500">Ask anything about this document</p>
+        {selectedDocs.length === 1 ? (
+          <>
+            <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{selectedDocs[0].filename}</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500">Ask anything about this document</p>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {selectedDocs.map(d => (
+                <span key={d.doc_id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-medium">
+                  <FileText size={10} />
+                  {d.filename.replace(/\.pdf$/i, '')}
+                </span>
+              ))}
+            </div>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Chatting across {selectedDocs.length} documents</p>
+          </>
+        )}
       </div>
 
       {/* Messages */}
@@ -168,7 +206,7 @@ export default function ChatPanel({ activeDoc }) {
           </div>
         )}
 
-        {messages.map(msg => <Message key={msg.id} msg={msg} />)}
+        {messages.map(msg => <Message key={msg.id} msg={msg} isStreaming={streaming} />)}
         <div ref={bottomRef} />
       </div>
 
@@ -184,13 +222,23 @@ export default function ChatPanel({ activeDoc }) {
             className="flex-1 bg-transparent text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 resize-none outline-none max-h-32"
             style={{ lineHeight: '1.5rem' }}
           />
-          <button
-            onClick={submit}
-            disabled={!input.trim() || streaming}
-            className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white transition-colors"
-          >
-            {streaming ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-          </button>
+          {streaming ? (
+            <button
+              onClick={abort}
+              className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-red-500 hover:bg-red-600 text-white transition-colors"
+              title="Stop generating"
+            >
+              <Square size={12} fill="currentColor" />
+            </button>
+          ) : (
+            <button
+              onClick={submit}
+              disabled={!input.trim()}
+              className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white transition-colors"
+            >
+              <Send size={14} />
+            </button>
+          )}
         </div>
         <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5 text-center">
           Enter to send · Shift+Enter for new line

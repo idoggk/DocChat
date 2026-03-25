@@ -7,28 +7,37 @@ import ErrorBoundary from './components/ErrorBoundary'
 import { useDocuments } from './hooks/useDocuments'
 
 export default function App() {
-  const [activeDoc, setActiveDoc] = useState(null)
+  const [selectedDocIds, setSelectedDocIds] = useState([])
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const { documents, loading, uploading, error, uploadDocument, deleteDocument } = useDocuments()
+  const { documents, loading, uploading, uploadProgress, error, uploadDocument, deleteDocument } = useDocuments()
 
   const showWelcome = !loading && documents.length === 0
 
   const handleUpload = async (file) => {
     const doc = await uploadDocument(file)
-    if (doc) setActiveDoc({ doc_id: doc.doc_id, filename: doc.filename })
+    if (doc) setSelectedDocIds([doc.doc_id])
+  }
+
+  const handleToggleDoc = (doc) => {
+    setSelectedDocIds(prev =>
+      prev.includes(doc.doc_id)
+        ? prev.filter(id => id !== doc.doc_id)
+        : [...prev, doc.doc_id]
+    )
   }
 
   const handleDelete = (docId) => {
     deleteDocument(docId)
-    if (activeDoc?.doc_id === docId) setActiveDoc(null)
+    setSelectedDocIds(prev => prev.filter(id => id !== docId))
   }
 
-  // Welcome screen — no sidebar
+  const selectedDocs = documents.filter(d => selectedDocIds.includes(d.doc_id))
+
   if (showWelcome) {
     return (
       <ErrorBoundary>
         <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-950">
-          <WelcomeScreen onUpload={handleUpload} uploading={uploading} error={error} />
+          <WelcomeScreen onUpload={handleUpload} uploading={uploading} uploadProgress={uploadProgress} error={error} />
         </div>
       </ErrorBoundary>
     )
@@ -55,9 +64,10 @@ export default function App() {
             documents={documents}
             loading={loading}
             uploading={uploading}
+            uploadProgress={uploadProgress}
             error={error}
-            activeDocId={activeDoc?.doc_id}
-            onSelect={(doc) => { setActiveDoc(doc); setSidebarOpen(false) }}
+            selectedDocIds={selectedDocIds}
+            onToggle={(doc) => { handleToggleDoc(doc); setSidebarOpen(false) }}
             onUpload={handleUpload}
             onDelete={handleDelete}
             onClose={() => setSidebarOpen(false)}
@@ -78,7 +88,7 @@ export default function App() {
           </div>
 
           <ErrorBoundary>
-            <ChatPanel activeDoc={activeDoc} />
+            <ChatPanel selectedDocs={selectedDocs} />
           </ErrorBoundary>
         </div>
       </div>

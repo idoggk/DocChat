@@ -47,23 +47,24 @@ def add_document_chunks(
 
 def query_similar_chunks(
     session_id: str,
-    doc_id: str,
+    doc_ids: list[str],
     query_embedding: list[float],
 ) -> list[dict]:
-    """Retrieve top-K similar chunks for a given query within a document."""
+    """Retrieve top-K similar chunks for a given query within one or more documents."""
     collection = _client.get_or_create_collection(
         name=_collection_name(session_id),
         metadata={"hnsw:space": "cosine"},
     )
+    where = {"doc_id": doc_ids[0]} if len(doc_ids) == 1 else {"doc_id": {"$in": doc_ids}}
     results = collection.query(
         query_embeddings=[query_embedding],
         n_results=TOP_K_RESULTS,
-        where={"doc_id": doc_id},
+        where=where,
         include=["documents", "metadatas"],
     )
     chunks: list[dict] = []
     for doc, meta in zip(results["documents"][0], results["metadatas"][0]):
-        chunks.append({"text": doc, "page": meta.get("page")})
+        chunks.append({"text": doc, "page": meta.get("page"), "filename": meta.get("filename")})
     return chunks
 
 

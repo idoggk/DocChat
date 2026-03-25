@@ -27,7 +27,9 @@ def _build_context_block(chunks: list[dict]) -> str:
     parts = []
     for i, chunk in enumerate(chunks):
         page_info = f"Page {chunk['page']}" if chunk.get("page") else "Unknown page"
-        parts.append(f"[Chunk {i + 1} — {page_info}]\n{chunk['text']}")
+        filename = chunk.get("filename", "")
+        source_label = f"{filename} — {page_info}" if filename else page_info
+        parts.append(f"[Chunk {i + 1} — {source_label}]\n{chunk['text']}")
     return "\n\n---\n\n".join(parts)
 
 
@@ -79,12 +81,12 @@ async def _generate_titles(chunks: list[dict]) -> list[str]:
 
 async def rag_stream(
     session_id: str,
-    doc_id: str,
+    doc_ids: list[str],
     question: str,
 ) -> AsyncIterator[str]:
     """Full RAG pipeline: embed question → retrieve chunks → stream GPT response as SSE."""
     query_embedding = await embedding_service.embed_query(question)
-    chunks = vector_service.query_similar_chunks(session_id, doc_id, query_embedding)
+    chunks = vector_service.query_similar_chunks(session_id, doc_ids, query_embedding)
 
     if not chunks:
         raise ValueError("Document not found or has no content.")
@@ -116,6 +118,7 @@ async def rag_stream(
             "page_number": chunk.get("page"),
             "title": titles[j],
             "text_snippet": " ".join(chunk["text"].split()),
+            "filename": chunk.get("filename"),
         }
         for j, (orig_i, chunk) in enumerate(readable)
     ]

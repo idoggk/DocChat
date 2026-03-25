@@ -5,6 +5,7 @@ export function useDocuments() {
   const [documents, setDocuments] = useState([])
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
   const [error, setError] = useState(null)
 
   const fetchDocuments = useCallback(async () => {
@@ -24,6 +25,7 @@ export function useDocuments() {
 
   const uploadDocument = useCallback(async (file) => {
     setUploading(true)
+    setUploadProgress(0)
     setError(null)
     try {
       const formData = new FormData()
@@ -31,6 +33,9 @@ export function useDocuments() {
       const { data } = await axios.post('/api/documents/upload', formData, {
         withCredentials: true,
         headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (e) => {
+          if (e.total) setUploadProgress(Math.round((e.loaded / e.total) * 100))
+        },
       })
       await fetchDocuments()
       return data
@@ -40,6 +45,7 @@ export function useDocuments() {
       throw new Error(msg)
     } finally {
       setUploading(false)
+      setUploadProgress(0)
     }
   }, [fetchDocuments])
 
@@ -52,5 +58,5 @@ export function useDocuments() {
     }
   }, [])
 
-  return { documents, loading, uploading, error, uploadDocument, deleteDocument, refetch: fetchDocuments }
+  return { documents, loading, uploading, uploadProgress, error, uploadDocument, deleteDocument, refetch: fetchDocuments }
 }

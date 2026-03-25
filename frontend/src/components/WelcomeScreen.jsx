@@ -8,7 +8,7 @@ const FEATURES = [
   { icon: MessageSquare, text: 'Chat and get cited answers'      },
 ]
 
-export default function WelcomeScreen({ onUpload, uploading, error }) {
+export default function WelcomeScreen({ onUpload, uploading, uploadProgress, error }) {
   const [dragging, setDragging] = useState(false)
   const inputRef = useRef(null)
 
@@ -63,8 +63,20 @@ export default function WelcomeScreen({ onUpload, uploading, error }) {
           {uploading ? (
             <>
               <Loader2 size={36} className="mx-auto mb-3 text-blue-500 animate-spin" />
-              <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Processing PDF…</p>
-              <p className="text-xs text-slate-400 mt-1">Chunking and embedding your document</p>
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                {uploadProgress > 0 && uploadProgress < 100 ? `Uploading… ${uploadProgress}%` : 'Processing PDF…'}
+              </p>
+              <p className="text-xs text-slate-400 mt-1">
+                {uploadProgress < 100 ? 'Transferring file' : 'Chunking and embedding your document'}
+              </p>
+              {uploadProgress > 0 && uploadProgress < 100 && (
+                <div className="mt-3 h-1.5 w-48 mx-auto bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-blue-500 rounded-full transition-all duration-200"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+              )}
             </>
           ) : (
             <>
